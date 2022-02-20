@@ -1,0 +1,186 @@
+---
+title: "STAA 566 HW3"
+author: "Ryan Miller"
+output: html_document
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+---
+
+```{r, echo = FALSE, message = FALSE}
+## Load required libraries
+library( gridExtra  )
+library(  mapproj   )   # Req'd for mapping                 TODO: Remember to uninstall
+library(   maps     )   # Req'd for mapping                 TODO: Remember to uninstall
+library(    sf      )   # Req'd for simple features mapping TODO: Remember to uninstall
+library( tidycensus )   # Req'd for data retrieval          TODO: Remember to uninstall
+library( tidyverse  )
+library(   units    )   # Req'd for mapping                 TODO: Remember to uninstall
+library(  viridis   )
+# TODO: Also remember to uninstall libudunits2-dev from computer
+# TODO: Also remember to uninstall libgdal-dev     from computer
+
+## Clear function for ease (by default keeps all functions)
+# Optional input E - character array of exceptions
+# Optional input P - character array of inclusions
+clear <- function( all = FALSE, E = "", P = "" )
+{
+    # By default don't clear the loaded data unless intentionally cleared
+    if( ! all ){ E <- c( E, 'api.key' ) }
+
+    # Get list of functions and exclude anything in E
+    l <- setdiff( ls(envir=parent.frame()), c( lsf.str(envir=parent.frame()), E ) )
+
+    # Add P to the list.
+    if( all( P != "" ) ){ l <- c( l, P ) }
+
+    # Remove the stuff
+    rm( list = l, envir = parent.frame() )
+}
+
+## Clear things
+clear( )
+
+##########################################################################################
+## End Setup
+##########################################################################################
+
+```
+\
+\
+The data for this project comes from the US Census Boundary and Attribute Data via
+[tidycensus](https://cran.r-project.org/web/packages/tidycensus/index.html).
+
+The maps display the proportion of one-person, two-person, three-person, and
+four-plus-person households by state in the United States of America.
+
+I think that this data gives insight to the life-styles in different parts of the country,
+and therefore I find it interesting.
+
+I chose to display the maps using `coord_map( 'conic', lat0 = 30 )` in order for the map
+to not be skewed; i.e., the sizes of the states to not be distorted. I used the
+`viridis` color package to color the maps with the corrected color map `cividis`.
+
+```{r, echo = FALSE, message = FALSE}
+## Get CENSUS_API_KEY for querying data
+if( !exists( 'api.key' ) || api.key == '' )
+{
+    readRenviron( '~/.Renviron' )
+    api.key <- Sys.getenv( 'CENSUS_API_KEY' )
+}
+if( api.key == '' ){ stop('API KEY ERROR'); }
+
+## Get the household size
+hs <- get_decennial( geography = 'state', variables = c( 'H013001', 'H013002', 'H013003',
+                                                        'H013004', 'H013005', 'H013006',
+                                                        'H013007', 'H013008' ) )
+
+## Get U.S.A state data
+states <- map_data( 'state' ) %>% mutate( region = str_to_title( region ) )
+```
+
+```{r, echo = FALSE, results = 'hide'}
+head( hs )
+head( states )
+
+## There's almost certainly an easier way to do this in tidyverse
+tot   <- which( hs$variable == 'H013001' )
+op    <- which( hs$variable == 'H013002' )
+twp   <- which( hs$variable == 'H013003' )
+thp   <- which( hs$variable == 'H013004' )
+frp   <- which( hs$variable == 'H013005' )
+fvp   <- which( hs$variable == 'H013006' )
+sxp   <- which( hs$variable == 'H013007' )
+spp   <- which( hs$variable == 'H013008' )
+p.op  <- hs$value[ op ] / hs$value[ tot ]
+p.twp <- hs$value[ twp ] / hs$value[ tot ]
+p.thp <- hs$value[ thp ] / hs$value[ tot ]
+p.fpp <- sum( c(hs$value[ frp ], hs$value[ fvp ], hs$value[ sxp ], hs$value[ spp ] ) ) / hs$value[ tot ]
+
+## Update the housing data
+h.data <- hs[ tot, ]
+h.data <- h.data %>% select( -c(variable, value ) ) %>%
+    mutate( Total = hs$value[ tot ],
+    One.Person = hs$value[ op ] / Total,
+    Two.Person    = hs$value[ twp ] / Total,
+    Three.Person  = hs$value[ thp ] / Total,
+    Four.Person   = hs$value[ frp ] / Total,
+    Five.Person   = hs$value[ fvp ] / Total,
+    Six.Person    = hs$value[ sxp ] / Total,
+    SevenP.Person = hs$value[ spp ] / Total )
+
+# Ensure percentages sum to 1
+rowSums( data.matrix( h.data[ , 4:10 ]) )
+
+## Plot data for the four plots
+pd <- vector( 'list', 8 )
+pd[[1]] <- h.data %>% mutate( p = One.Person    ) %>% select( NAME, p )
+pd[[2]] <- h.data %>% mutate( p = Two.Person    ) %>% select( NAME, p )
+pd[[3]] <- h.data %>% mutate( p = Three.Person  ) %>% select( NAME, p )
+pd[[4]] <- h.data %>% mutate( p = Four.Person   ) %>% select( NAME, p )
+pd[[5]] <- h.data %>% mutate( p = Five.Person   ) %>% select( NAME, p )
+pd[[6]] <- h.data %>% mutate( p = Six.Person    ) %>% select( NAME, p )
+pd[[7]] <- h.data %>% mutate( p = SevenP.Person ) %>% select( NAME, p )
+pd[[8]] <- h.data %>% mutate( p = Six.Person + SevenP.Person ) %>% select( NAME, p )
+
+pd[[1]]$title <- 'One Person Households'
+pd[[2]]$title <- 'Two Person Households'
+pd[[3]]$title <- 'Three Person Households'
+pd[[4]]$title <- 'Four Person Households'
+pd[[5]]$title <- 'Five Person Households'
+pd[[6]]$title <- 'Six Person Households'
+pd[[7]]$title <- 'Seven Person Households'
+pd[[8]]$title <- 'Six+ Person Households'
+
+## Get a map of the U.S.A
+h <- lapply( pd, function( p )
+            {
+                ## TODO: Figure out how to do consistent color bar across all
+                pd_ <- states %>% left_join( p, c( 'region' = 'NAME' ) )
+                ttl <- p$title[1]
+
+                h_ <- ggplot( data = pd_, aes( x = long, y = lat, group = group,
+                                              fill = p ) ) +
+                    geom_polygon( color = 'white' ) +
+                    scale_fill_viridis( option = 'cividis', direction = -1 ) +
+                    theme_minimal() + theme( axis.title = element_blank() ) +
+                    ggtitle( ttl ) +
+                    guides( fill = guide_legend( title = 'Percent' ) ) +
+                    coord_map( 'conic', lat0 = 30 )
+
+                return( h_ )
+            } )
+```
+
+```{r, echo = FALSE, fig.align = 'center', results = 'hide'}
+grid.arrange( h[[1]], h[[2]], h[[3]], h[[4]], h[[5]], h[[8]],  nrow = 3, ncol = 2 )
+```
+\
+\
+\
+The above grid allows you to see overall trends, the larger individual plots are below.
+
+```{r, echo = FALSE, fig.align = 'center'}
+for( i in 1:( length( h ) - 1 ) )
+{
+    print( h[[i]] )
+}
+```
+
+
+\
+\
+\
+
+## Code
+
+```{r getlabs, results = 'hide', include = FALSE}
+## Get all the labels
+appLabs <- knitr::all_labels()
+appLabs <- setdiff( appLabs, c('getlabs', appLabs[grep("^hide", appLabs)]) )
+```
+
+```{r show-code, ref.label = appLabs, echo = TRUE, eval = FALSE}
+```
