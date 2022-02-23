@@ -12,15 +12,13 @@ knit: (function(input_file, encoding) {
 ```{r, echo = FALSE, message = FALSE}
 ## Load required libraries
 library( gridExtra  )
-library(  mapproj   )   # Req'd for mapping                 TODO: Remember to uninstall
-library(   maps     )   # Req'd for mapping                 TODO: Remember to uninstall
-library(    sf      )   # Req'd for simple features mapping TODO: Remember to uninstall
-library( tidycensus )   # Req'd for data retrieval          TODO: Remember to uninstall
+library(  mapproj   )   # Req'd for mapping
+library(   maps     )   # Req'd for mapping
+library(    sf      )   # Req'd for simple features mapping
+library( tidycensus )   # Req'd for data retrieval
 library( tidyverse  )
-library(   units    )   # Req'd for mapping                 TODO: Remember to uninstall
+library(   units    )   # Req'd for mapping
 library(  viridis   )
-# TODO: Also remember to uninstall libudunits2-dev from computer
-# TODO: Also remember to uninstall libgdal-dev     from computer
 
 ## Clear function for ease (by default keeps all functions)
 # Optional input E - character array of exceptions
