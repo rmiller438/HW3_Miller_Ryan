@@ -53,15 +53,19 @@ clear( )
 The data for this project comes from the US Census Boundary and Attribute Data via
 [tidycensus](https://cran.r-project.org/web/packages/tidycensus/index.html).
 
-The maps display the proportion of one-person, two-person, three-person, and
-four-plus-person households by state in the United States of America.
+The maps display household size proportions by state in the U.S.A.
 
 I think that this data gives insight to the life-styles in different parts of the country,
 and therefore I find it interesting.
 
 I chose to display the maps using `coord_map( 'conic', lat0 = 30 )` in order for the map
-to not be skewed; i.e., the sizes of the states to not be distorted. I used the
-`viridis` color package to color the maps with the corrected color map `cividis`.
+to not be skewed; i.e., the sizes of the states to not be distorted.
+
+I plotted the data in two ways, first using a consistent color scaling so that the scale
+would be the same across the maps, which I thought would be helpful in interpreting the
+results and identifying overall trends. This can be seen in the first 3x2 set of plots.
+I used the `magma` color map on these plots because I thought it was the most
+interpretable given the scale.
 
 ```{r, echo = FALSE, message = FALSE}
 ## Get CENSUS_API_KEY for querying data
@@ -131,20 +135,28 @@ pd[[3]]$title <- 'Three Person Households'
 pd[[4]]$title <- 'Four Person Households'
 pd[[5]]$title <- 'Five Person Households'
 pd[[6]]$title <- 'Six Person Households'
-pd[[7]]$title <- 'Seven Person Households'
+pd[[7]]$title <- 'Seven+ Person Households'
 pd[[8]]$title <- 'Six+ Person Households'
 
-## Get a map of the U.S.A
+## Get the range of percentages
+rngs <- unlist( lapply( pd, function(p){ range( p$p ) } ) )
+rngs
+min.p <- min( rngs )
+# [1] 0.007083391
+max.p <- max( rngs )
+# [1] 0.4402997
+
+## Create a map of the U.S.A colored by household size w/consistent palette
 h <- lapply( pd, function( p )
             {
-                ## TODO: Figure out how to do consistent color bar across all
                 pd_ <- states %>% left_join( p, c( 'region' = 'NAME' ) )
                 ttl <- p$title[1]
 
                 h_ <- ggplot( data = pd_, aes( x = long, y = lat, group = group,
                                               fill = p ) ) +
                     geom_polygon( color = 'white' ) +
-                    scale_fill_viridis( option = 'cividis', direction = -1 ) +
+                    scale_fill_viridis( limits = c(min.p, max.p), direction = -1,
+                                       option = 'A' ) +
                     theme_minimal() + theme( axis.title = element_blank() ) +
                     ggtitle( ttl ) +
                     guides( fill = guide_legend( title = 'Percent' ) ) +
@@ -160,13 +172,38 @@ grid.arrange( h[[1]], h[[2]], h[[3]], h[[4]], h[[5]], h[[8]],  nrow = 3, ncol = 
 \
 \
 \
-The above grid allows you to see overall trends, the larger individual plots are below.
-
+For the second way of plotting, I made individual maps, each with it's own color scaling.
+Since the color scales are not consistent, it allows differences to be seen in finer
+detail. But since the scales are no longer consistent, I did not think plotting them all
+together would make sense, so they are each their own plot. This set of plots also
+includes an extra 7+ Person Households. Here I used a different color map, `viridis`, for
+two reasons. First to highlight the different scaling from the plots above. Second,
+because the color scale is tailored to each individual plot, this map provided better
+interpretability.
 ```{r, echo = FALSE, fig.align = 'center'}
-for( i in 1:( length( h ) - 1 ) )
+hi <- lapply( pd, function( p )
+            {
+                pd_ <- states %>% left_join( p, c( 'region' = 'NAME' ) )
+                ttl <- p$title[1]
+
+                h_ <- ggplot( data = pd_, aes( x = long, y = lat, group = group,
+                                              fill = p ) ) +
+                    geom_polygon( color = 'white' ) +
+                    scale_fill_viridis( direction = -1 ) +
+                    theme_minimal() + theme( axis.title = element_blank() ) +
+                    ggtitle( ttl ) +
+                    guides( fill = guide_legend( title = 'Percent' ) ) +
+                    coord_map( 'conic', lat0 = 30 )
+
+                return( h_ )
+            } )
+for( i in 1:( length( hi )-2) )
 {
-    print( h[[i]] )
+    print( hi[[i]] )
 }
+hi[[length(hi)]]
+hi[[length(hi)-1]]
+
 ```
 
 
